@@ -1,103 +1,145 @@
-import Image from "next/image";
+'use client';
+import { useState } from 'react';
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState([]);
+  const [transactions, setTransactions] = useState([]);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleFileChange = (e) => setFile(e.target.files[0]);
+
+  const handleUpload = async () => {
+    if (!file) return alert('Please select a PDF file.');
+
+    setLoading(true);
+    setSummary([]);
+    setTransactions([]);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/extract-table', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to extract table');
+
+      setSummary(data.summary || []);
+      setTransactions(data.transactions || []);
+    } catch (err) {
+      alert('Extraction failed: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatAmount = (val) => {
+    if (!val) return '';
+    const num = parseFloat(val.replace(/[^0-9.-]/g, ''));
+    if (isNaN(num)) return val;
+    return num < 0
+      ? <span className="text-red-600">(${Math.abs(num).toLocaleString()})</span>
+      : <span className="text-green-600">${num.toLocaleString()}</span>;
+  };
+
+  return (
+    <main className="max-w-6xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6 text-gray-800">
+        📑 PDF Statement Extractor
+      </h1>
+
+      {/* Upload Section */}
+      <div className="flex items-center gap-4 mb-8">
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={handleFileChange}
+          className="block text-sm text-gray-700
+            file:mr-4 file:py-2 file:px-4
+            file:rounded-lg file:border-0
+            file:text-sm file:font-semibold
+            file:bg-blue-50 file:text-blue-600
+            hover:file:bg-blue-100"
+        />
+        <button
+          onClick={handleUpload}
+          disabled={loading}
+          className={`px-6 py-2 rounded-lg font-medium text-white transition ${
+            loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+        >
+          {loading ? 'Extracting…' : 'Extract Tables'}
+        </button>
+      </div>
+
+      {/* Account Summary */}
+      {summary.length > 0 && (
+        <div className="bg-white shadow rounded-xl p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">Account Summary</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse text-sm">
+              <thead className="bg-gray-100 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600">Account Number</th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600">Account Name</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-600">Deposits</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-600">Withdrawals</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-600">Ending Balance</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-600">YTD Dividends</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.map((row, i) => (
+                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-4 py-2">{row.accountNumber}</td>
+                    <td className="px-4 py-2">{row.accountName}</td>
+                    <td className="px-4 py-2 text-right">{formatAmount(row.deposits)}</td>
+                    <td className="px-4 py-2 text-right">{formatAmount(row.withdrawals)}</td>
+                    <td className="px-4 py-2 text-right font-medium">{formatAmount(row.balance)}</td>
+                    <td className="px-4 py-2 text-right">{formatAmount(row.ytdDividends)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      )}
+
+      {/* Transactions */}
+      {transactions.length > 0 && (
+        <div className="bg-white shadow rounded-xl p-6">
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">Transactions</h2>
+          <div className="overflow-x-auto max-h-[600px]">
+            <table className="min-w-full border-collapse text-sm">
+              <thead className="bg-gray-100 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600">Date</th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600">Transaction Detail</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-600">Amount ($)</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-600">Balance ($)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((row, i) => (
+                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-4 py-2 whitespace-nowrap">{row.date}</td>
+                    <td className="px-4 py-2">{row.description}</td>
+                    <td className="px-4 py-2 text-right">{formatAmount(row.amount)}</td>
+                    <td className="px-4 py-2 text-right font-medium">{formatAmount(row.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {summary.length === 0 && transactions.length === 0 && !loading && (
+        <div className="text-gray-500 mt-10 text-center">
+          No data yet — upload a PDF and click <span className="font-medium">Extract Tables</span>.
+        </div>
+      )}
+    </main>
   );
 }
