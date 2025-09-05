@@ -20,7 +20,10 @@ export default function Home() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch('/api/extract-table', { method: 'POST', body: formData });
+      const res = await fetch('/api/extract-table', {
+        method: 'POST',
+        body: formData
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to extract table');
 
@@ -33,13 +36,15 @@ export default function Home() {
     }
   };
 
-  const formatAmount = (val) => {
+  // format with commas, no currency symbols
+  const formatNumber = (val) => {
     if (!val) return '';
-    const num = parseFloat(val.replace(/[^0-9.-]/g, ''));
+    const num = parseFloat(val);
     if (isNaN(num)) return val;
-    return num < 0
-      ? <span className="text-red-600">(${Math.abs(num).toLocaleString()})</span>
-      : <span className="text-green-600">${num.toLocaleString()}</span>;
+    return num.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   };
 
   return (
@@ -48,7 +53,7 @@ export default function Home() {
         📑 PDF Statement Extractor
       </h1>
 
-      {/* Upload Section */}
+      {/* Upload */}
       <div className="flex items-center gap-4 mb-8">
         <input
           type="file"
@@ -72,7 +77,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Account Summary */}
+      {/* Summary */}
       {summary.length > 0 && (
         <div className="bg-white shadow rounded-xl p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4 text-gray-700">Account Summary</h2>
@@ -93,10 +98,18 @@ export default function Home() {
                   <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="px-4 py-2">{row.accountNumber}</td>
                     <td className="px-4 py-2">{row.accountName}</td>
-                    <td className="px-4 py-2 text-right">{formatAmount(row.deposits)}</td>
-                    <td className="px-4 py-2 text-right">{formatAmount(row.withdrawals)}</td>
-                    <td className="px-4 py-2 text-right font-medium">{formatAmount(row.balance)}</td>
-                    <td className="px-4 py-2 text-right">{formatAmount(row.ytdDividends)}</td>
+                    <td className="px-4 py-2 text-right text-green-600">
+                      {formatNumber(row.deposits)}
+                    </td>
+                    <td className="px-4 py-2 text-right text-red-600">
+                      {formatNumber(row.withdrawals)}
+                    </td>
+                    <td className="px-4 py-2 text-right font-medium">
+                      {formatNumber(row.balance)}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {formatNumber(row.ytdDividends)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -115,8 +128,9 @@ export default function Home() {
                 <tr>
                   <th className="px-4 py-2 text-left font-semibold text-gray-600">Date</th>
                   <th className="px-4 py-2 text-left font-semibold text-gray-600">Transaction Detail</th>
-                  <th className="px-4 py-2 text-right font-semibold text-gray-600">Amount ($)</th>
-                  <th className="px-4 py-2 text-right font-semibold text-gray-600">Balance ($)</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-600">Debit</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-600">Credit</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-600">Balance</th>
                 </tr>
               </thead>
               <tbody>
@@ -124,8 +138,15 @@ export default function Home() {
                   <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="px-4 py-2 whitespace-nowrap">{row.date}</td>
                     <td className="px-4 py-2">{row.description}</td>
-                    <td className="px-4 py-2 text-right">{formatAmount(row.amount)}</td>
-                    <td className="px-4 py-2 text-right font-medium">{formatAmount(row.balance)}</td>
+                    <td className="px-4 py-2 text-right text-red-600">
+                      {row.debit ? formatNumber(row.debit) : ''}
+                    </td>
+                    <td className="px-4 py-2 text-right text-green-600">
+                      {row.credit ? formatNumber(row.credit) : ''}
+                    </td>
+                    <td className="px-4 py-2 text-right font-medium">
+                      {formatNumber(row.balance)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -134,7 +155,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Empty State */}
+      {/* Empty state */}
       {summary.length === 0 && transactions.length === 0 && !loading && (
         <div className="text-gray-500 mt-10 text-center">
           No data yet — upload a PDF and click <span className="font-medium">Extract Tables</span>.
